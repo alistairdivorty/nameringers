@@ -17,6 +17,14 @@ public class CdkApp {
                 .env(env)
                 .build());
 
+        new WeaviateFileSystemStack(app, "WeaviateFileSystemStack", StackProps.builder()
+                .env(env)
+                .build());
+
+        new WeaviateStack(app, "WeaviateStack", StackProps.builder()
+                .env(env)
+                .build());
+
         app.synth();
     }
 }

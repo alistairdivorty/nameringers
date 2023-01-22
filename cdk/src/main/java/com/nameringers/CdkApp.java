@@ -25,6 +25,10 @@ public class CdkApp {
                 .env(env)
                 .build());
 
+        new EMRServerlessStack(app, "NameRingersEMRServerlessStack", StackProps.builder()
+                .env(env)
+                .build());
+
         app.synth();
     }
 }

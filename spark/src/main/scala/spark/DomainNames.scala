@@ -37,12 +37,13 @@ object DomainNames {
         val df = spark.read
             .textFile(zoneFileUri)
             .toDF()
+            .withColumnRenamed("value", "name")
             .withColumn(
               "gtld",
-              regexp_extract(col("value"), "\\.([a-z]+)$", 1)
+              regexp_extract(col("name"), "\\.([a-z]+)$", 1)
             )
-            .withColumn("name", regexp_extract(col("value"), "^([^.]+)", 1))
-            .withColumn("input", concat(lit(" "), col("name"), lit(" ")))
+            .withColumn("sld", regexp_extract(col("name"), "^([^.]+)", 1))
+            .withColumn("input", concat(lit(" "), col("sld"), lit(" ")))
 
         val tokenizer = new RegexTokenizer()
             .setInputCol("input")
@@ -55,7 +56,7 @@ object DomainNames {
         val hashingTF = new HashingTF()
             .setInputCol("ngrams")
             .setOutputCol("rawFeatures")
-            .setNumFeatures(4096)
+            .setNumFeatures(2048)
 
         val idf = new IDF().setInputCol("rawFeatures").setOutputCol("features")
 
@@ -84,7 +85,7 @@ object DomainNames {
 
         s3Client.putObject(
           bucketName,
-          "models/tfidf",
+          "models/tfidf/bundle.zip",
           new java.io.File("/tmp/tfidf.zip")
         )
 

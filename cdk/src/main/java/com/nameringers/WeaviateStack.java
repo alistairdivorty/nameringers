@@ -7,6 +7,7 @@ import software.constructs.Construct;
 import software.amazon.awscdk.Stack;
 import software.amazon.awscdk.StackProps;
 import software.amazon.awscdk.Fn;
+import software.amazon.awscdk.CfnOutput;
 import software.amazon.awscdk.RemovalPolicy;
 import software.amazon.awscdk.Duration;
 
@@ -62,7 +63,7 @@ public class WeaviateStack extends Stack {
         IVpc vpc = Vpc.fromLookup(this, "Vpc", VpcLookupOptions.builder().vpcName("VPC").build());
 
         Cluster cluster = Cluster.Builder.create(this, "Cluster").vpc(vpc).capacity(AddCapacityOptions.builder()
-                .instanceType(new InstanceType("t4g.small"))
+                .instanceType(new InstanceType("t4g.large"))
                 .machineImage(EcsOptimizedImage.amazonLinux2(AmiHardwareType.ARM,
                         EcsOptimizedImageOptions.builder()
                                 .cachedInContext(true)
@@ -70,10 +71,10 @@ public class WeaviateStack extends Stack {
                 .desiredCapacity(1)
                 .build()).build();
 
-        ApplicationLoadBalancedEc2Service fargateService = ApplicationLoadBalancedEc2Service.Builder
+        ApplicationLoadBalancedEc2Service ec2Service = ApplicationLoadBalancedEc2Service.Builder
                 .create(this, "Ec2Service")
                 .cluster(cluster)
-                .memoryReservationMiB(750)
+                .memoryReservationMiB(7000)
                 .desiredCount(1)
                 .minHealthyPercent(0)
                 .maxHealthyPercent(100)
@@ -100,25 +101,25 @@ public class WeaviateStack extends Stack {
                 .publicLoadBalancer(true)
                 .build();
 
-        fargateService.getTargetGroup()
+        ec2Service.getTargetGroup()
                 .configureHealthCheck(
                         HealthCheck.builder().path("/v1/.well-known/live").interval(Duration.seconds(120))
                                 .timeout(Duration.seconds(30)).build());
 
-        fargateService.getTargetGroup().setAttribute("deregistration_delay.timeout_seconds", "0");
+        ec2Service.getTargetGroup().setAttribute("deregistration_delay.timeout_seconds", "0");
 
-        fargateService.getTaskDefinition().getDefaultContainer().addPortMappings(PortMapping.builder()
+        ec2Service.getTaskDefinition().getDefaultContainer().addPortMappings(PortMapping.builder()
                 .containerPort(8080)
                 .protocol(Protocol.TCP)
                 .build());
 
-        fargateService.getTaskDefinition().getTaskRole()
+        ec2Service.getTaskDefinition().getTaskRole()
                 .addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName("CloudWatchLogsFullAccess"));
 
         Port allowedPorts = Port.Builder.create().protocol(software.amazon.awscdk.services.ec2.Protocol.TCP).fromPort(0)
                 .toPort(65535).stringRepresentation("All").build();
 
-        fargateService.getService().getConnections().allowFromAnyIpv4(allowedPorts);
+        ec2Service.getService().getConnections().allowFromAnyIpv4(allowedPorts);
 
         IFileSystem fileSystem = FileSystem.fromFileSystemAttributes(this, "FileSystem", FileSystemAttributes.builder()
                 .fileSystemArn(Fn.importValue("WeaviateFileSystemARN"))
@@ -132,9 +133,9 @@ public class WeaviateStack extends Stack {
 
         fileSystem.getConnections().allowInternally(Port.tcp(2049));
 
-        fileSystem.getConnections().allowDefaultPortFrom(fargateService.getService());
+        fileSystem.getConnections().allowDefaultPortFrom(ec2Service.getService());
 
-        fargateService.getTaskDefinition().getTaskRole().addManagedPolicy(
+        ec2Service.getTaskDefinition().getTaskRole().addManagedPolicy(
                 ManagedPolicy.fromAwsManagedPolicyName("AmazonElasticFileSystemClientReadWriteAccess"));
 
         IAccessPoint accessPoint = AccessPoint.fromAccessPointAttributes(this, "AccessPoint",
@@ -152,12 +153,17 @@ public class WeaviateStack extends Stack {
                         .build())
                 .build();
 
-        fargateService.getTaskDefinition().addVolume(volume);
+        ec2Service.getTaskDefinition().addVolume(volume);
 
-        fargateService.getTaskDefinition().getDefaultContainer().addMountPoints(MountPoint.builder()
+        ec2Service.getTaskDefinition().getDefaultContainer().addMountPoints(MountPoint.builder()
                 .containerPath("/mnt/weaviate")
                 .readOnly(false)
                 .sourceVolume("weaviate")
                 .build());
+
+        CfnOutput.Builder.create(this, "LoadBalancerDNSName")
+                .value(ec2Service.getLoadBalancer().getLoadBalancerDnsName())
+                .exportName("WeaviateLoadBalancerDNSName")
+                .build();
     }
 }

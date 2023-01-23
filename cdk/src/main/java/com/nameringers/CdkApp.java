@@ -29,6 +29,10 @@ public class CdkApp {
                 .env(env)
                 .build());
 
+        new WeaviateClientStack(app, "WeaviateClientStack", StackProps.builder()
+                .env(env)
+                .build());
+
         app.synth();
     }
 }

@@ -57,6 +57,14 @@ class ScalaHandler
 
         return APIGatewayV2HTTPResponse
             .builder()
+            .withHeaders(
+              Map.of(
+                "Access-Control-Allow-Headers",
+                "*",
+                "Access-Control-Allow-Origin",
+                "*"
+              )
+            )
             .withStatusCode(200)
             .withBody(response.body.right.get)
             .build()

@@ -1,5 +1,7 @@
 package client
 
+import java.util.Map;
+
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
 import com.amazonaws.services.lambda.runtime.events.{
     APIGatewayV2HTTPEvent,
@@ -21,6 +23,15 @@ class ScalaHandler
     extends RequestHandler[APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse] {
 
     val client = SimpleHttpClient()
+
+    val bundle =
+        (for (
+          bundle <- managed(
+            BundleFile("file:/opt")
+          )
+        ) yield {
+            bundle.loadMleapBundle().get
+        }).tried.get
 
     override def handleRequest(
         event: APIGatewayV2HTTPEvent,

@@ -1,5 +1,7 @@
 package client
 
+import java.util.Map;
+
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
 import com.amazonaws.services.lambda.runtime.events.{
     APIGatewayV2HTTPEvent,
@@ -16,25 +18,66 @@ import ml.combust.bundle.BundleFile
 
 import resource._
 import scala.collection.JavaConversions;
+import scala.util.{Try, Success, Failure}
 
 class ScalaHandler
     extends RequestHandler[APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse] {
 
     val client = SimpleHttpClient()
 
+    val bundle =
+        (for (
+          bundle <- managed(
+            BundleFile("file:/opt")
+          )
+        ) yield {
+            bundle.loadMleapBundle().get
+        }).tried.get
+
     override def handleRequest(
         event: APIGatewayV2HTTPEvent,
         context: Context
     ): APIGatewayV2HTTPResponse = {
+        val result = queryDatabase(event)
+
+        return APIGatewayV2HTTPResponse
+            .builder()
+            .withHeaders(
+              Map.of(
+                "Access-Control-Allow-Headers",
+                "*",
+                "Access-Control-Allow-Origin",
+                "*"
+              )
+            )
+            .withStatusCode(result match {
+                case Success(graphQlResult) => 200
+                case Failure(reason)        => 500
+            })
+            .withBody(result match {
+                case Success(graphQlResult) => graphQlResult
+                case Failure(reason)        => reason.toString()
+            })
+            .build()
+    }
+
+    def queryDatabase(event: APIGatewayV2HTTPEvent): Try[String] = Try {
         val queryParams =
             event.getQueryStringParameters
 
-        val query = queryParams.get("query")
-        val distance = queryParams.get("distance").toFloat
+        var query = None: Option[String]
+        var distance = None: Option[Float]
 
-        val vector = getStringVector(query)
+        try {
+            query = Some(queryParams.get("query"))
+            distance = Some(queryParams.get("distance").toFloat)
+        } catch {
+            case e: Exception =>
+                throw new Exception("Invalid query parameters.")
+        }
 
-        val graphQlQuery = buildGraphQlQuery(vector, distance)
+        val vector = getStringVector(query.get)
+        val graphQlQuery = buildGraphQlQuery(vector, distance.get)
 
         val response = client
             .send(
@@ -44,11 +87,7 @@ class ScalaHandler
                   .body(graphQlQuery)
             )
 
-        return APIGatewayV2HTTPResponse
-            .builder()
-            .withStatusCode(200)
-            .withBody(response.body.right.get)
-            .build()
+        response.body.right.get
     }
 
     def getStringVector(query: String): String = {

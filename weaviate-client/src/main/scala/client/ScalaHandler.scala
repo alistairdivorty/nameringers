@@ -18,6 +18,7 @@ import ml.combust.bundle.BundleFile
 
 import resource._
 import scala.collection.JavaConversions;
+import scala.util.{Try, Success, Failure}
 
 class ScalaHandler
     extends RequestHandler[APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse] {
@@ -37,23 +38,7 @@ class ScalaHandler
         event: APIGatewayV2HTTPEvent,
         context: Context
     ): APIGatewayV2HTTPResponse = {
-        val queryParams =
-            event.getQueryStringParameters
-
-        val query = queryParams.get("query")
-        val distance = queryParams.get("distance").toFloat
-
-        val vector = getStringVector(query)
-
-        val graphQlQuery = buildGraphQlQuery(vector, distance)
-
-        val response = client
-            .send(
-              basicRequest
-                  .contentType("application/json")
-                  .post(uri"${sys.env.get("WEAVIATE_ENDPOINT").get}")
-                  .body(graphQlQuery)
-            )
+        val result = queryDatabase(event)
 
         return APIGatewayV2HTTPResponse
             .builder()
@@ -65,9 +50,44 @@ class ScalaHandler
                 "*"
               )
             )
-            .withStatusCode(200)
-            .withBody(response.body.right.get)
+            .withStatusCode(result match {
+                case Success(graphQlResult) => 200
+                case Failure(reason)        => 500
+            })
+            .withBody(result match {
+                case Success(graphQlResult) => graphQlResult
+                case Failure(reason)        => reason.toString()
+            })
             .build()
+    }
+
+    def queryDatabase(event: APIGatewayV2HTTPEvent): Try[String] = Try {
+        val queryParams =
+            event.getQueryStringParameters
+
+        var query = None: Option[String]
+        var distance = None: Option[Float]
+
+        try {
+            query = Some(queryParams.get("query"))
+            distance = Some(queryParams.get("distance").toFloat)
+        } catch {
+            case e: Exception =>
+                throw new Exception("Invalid query parameters.")
+        }
+
+        val vector = getStringVector(query.get)
+        val graphQlQuery = buildGraphQlQuery(vector, distance.get)
+
+        val response = client
+            .send(
+              basicRequest
+                  .contentType("application/json")
+                  .post(uri"${sys.env.get("WEAVIATE_ENDPOINT").get}")
+                  .body(graphQlQuery)
+            )
+
+        response.body.right.get
     }
 
     def getStringVector(query: String): String = {

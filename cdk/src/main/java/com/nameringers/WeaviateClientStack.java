@@ -16,10 +16,13 @@ import software.amazon.awscdk.DockerVolume;
 import software.amazon.awscdk.Duration;
 
 import software.amazon.awscdk.services.lambda.Function;
+import software.amazon.awscdk.services.lambda.CfnFunction;
+import software.amazon.awscdk.services.lambda.Version;
 import software.amazon.awscdk.services.lambda.LayerVersion;
 import software.amazon.awscdk.services.lambda.Code;
 import software.amazon.awscdk.services.lambda.Runtime;
 import software.amazon.awscdk.services.lambda.Architecture;
+import software.amazon.awscdk.services.lambda.Tracing;
 
 import software.amazon.awscdk.services.ec2.Vpc;
 import software.amazon.awscdk.services.ec2.VpcLookupOptions;
@@ -29,13 +32,33 @@ import software.amazon.awscdk.services.s3.Bucket;
 import software.amazon.awscdk.services.s3.IBucket;
 import software.amazon.awscdk.services.s3.assets.AssetOptions;
 
-import software.amazon.awscdk.services.apigateway.*;
+import software.amazon.awscdk.services.apigateway.LambdaRestApi;
+import software.amazon.awscdk.services.apigateway.CorsOptions;
+import software.amazon.awscdk.services.apigateway.Cors;
+import software.amazon.awscdk.services.apigateway.DomainNameOptions;
+
+import software.amazon.awscdk.services.route53.HostedZone;
+import software.amazon.awscdk.services.route53.IHostedZone;
+import software.amazon.awscdk.services.route53.HostedZoneAttributes;
+import software.amazon.awscdk.services.route53.targets.ApiGateway;
+import software.amazon.awscdk.services.route53.ARecord;
+import software.amazon.awscdk.services.route53.RecordTarget;
+import software.amazon.awscdk.services.route53.IAliasRecordTarget;
+
+import software.amazon.awscdk.services.certificatemanager.Certificate;
+import software.amazon.awscdk.services.certificatemanager.CertificateValidation;
+
+import software.amazon.awscdk.services.events.Rule;
+import software.amazon.awscdk.services.events.Schedule;
+import software.amazon.awscdk.services.events.targets.LambdaFunction;
 
 import software.amazon.awscdk.services.logs.RetentionDays;
 import software.amazon.awscdk.services.iam.PolicyStatement;
 
 import static java.util.Collections.singletonList;
 import static software.amazon.awscdk.BundlingOutput.ARCHIVED;
+
+import io.github.cdimascio.dotenv.Dotenv;
 
 public class WeaviateClientStack extends Stack {
     public WeaviateClientStack(final Construct scope, final String id) {
@@ -44,6 +67,8 @@ public class WeaviateClientStack extends Stack {
 
     public WeaviateClientStack(final Construct scope, final String id, final StackProps props) {
         super(scope, id, props);
+
+        Dotenv dotenv = Dotenv.load();
 
         IVpc vpc = Vpc.fromLookup(this, "Vpc", VpcLookupOptions.builder().vpcName("VPC").build());
 
@@ -89,12 +114,38 @@ public class WeaviateClientStack extends Stack {
                 .vpc(vpc)
                 .environment(Map.of("WEAVIATE_ENDPOINT",
                         "http://" + Fn.importValue("WeaviateLoadBalancerDNSName") + "/v1/graphql"))
+                // .tracing(Tracing.ACTIVE)
                 .build();
 
-        RestApi api = RestApi.Builder.create(this, "Api")
-                .restApiName("nameringers")
+        CfnFunction functionResource = (CfnFunction) function.getNode().getDefaultChild();
+        functionResource.addPropertyOverride("SnapStart", Map.of("ApplyOn",
+                "PublishedVersions"));
+
+        Rule eventRule = Rule.Builder.create(this, "Rule")
+                .schedule(Schedule.rate(Duration.minutes(5)))
                 .build();
 
-        api.getRoot().addMethod("GET", new LambdaIntegration(function));
+        eventRule.addTarget(new LambdaFunction(function));
+
+        LambdaRestApi api = LambdaRestApi.Builder.create(this, "RestAPI")
+                .handler(function)
+                .build();
+
+        IHostedZone hostedZone = HostedZone.fromHostedZoneAttributes(this, "HostedZone", HostedZoneAttributes.builder()
+                .hostedZoneId(dotenv.get("HOSTED_ZONE_ID"))
+                .zoneName("nameringers.com")
+                .build());
+
+        api.addDomainName("CustomDomain", DomainNameOptions.builder()
+                .domainName("api.nameringers.com")
+                .certificate(Certificate.Builder.create(this, "Certificate").domainName("api.nameringers.com")
+                        .validation(CertificateValidation.fromDns(hostedZone)).build())
+                .build());
+
+        ARecord.Builder.create(this, "AliasRecord")
+                .zone(hostedZone)
+                .recordName("api.nameringers.com")
+                .target(RecordTarget.fromAlias(new ApiGateway(api)))
+                .build();
     }
 }

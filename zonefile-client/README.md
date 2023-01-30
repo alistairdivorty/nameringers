@@ -1,45 +1,52 @@
-# App
+## Zone File Client
 
-This project contains an AWS Lambda maven application with [AWS Java SDK 2.x](https://github.com/aws/aws-sdk-java-v2) dependencies.
+- [What It Does](#1-what-it-does)
+- [Local Setup](#2-local-setup)
+  - [Prerequisites](#21-prerequisites)
+- [Directory Structure](#3-directory-structure)
+- [Deployment](#4-deployment)
+- [Invoke Lambda Function in Production Environment](#5-invoke-lambda-function-in-production-environment)
 
-## Prerequisites
-- Java 1.8+
-- Apache Maven
-- [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html)
-- Docker
+### 1. What It Does
 
-## Development
+This is a Lambda function written in Java that fetches compressed TXT files containing domain names extracted from the zone files for generic top-level domains, decompresses the data and uploads them to an S3 bucket for retrieval by the feature extraction pipeline. To ensure that the Lambda memory limit is not exceeded as a result of decompressing large files, data are written to an EFS volume mounted onto the function rather than the ephemeral Lambda file system.
 
-The generated function handler class just returns the input. The configured AWS Java SDK client is created in `DependencyFactory` class and you can 
-add the code to interact with the SDK client based on your use case.
+### 2. Local Setup
 
-#### Building the project
-```
-mvn clean install
-```
+#### 2.1. Prerequisites
 
-#### Testing it locally
-```
-sam local invoke
-```
+- [OpenJDK 11](https://adoptopenjdk.net/releases.html)
+- [Apache Maven](https://maven.apache.org/index.html)
 
-#### Adding more SDK clients
-To add more service clients, you need to add the specific services modules in `pom.xml` and create the clients in `DependencyFactory` following the same 
-pattern as s3Client.
-
-## Deployment
-
-The generated project contains a default [SAM template](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html) file `template.yaml` where you can 
-configure different properties of your lambda function such as memory size and timeout. You might also need to add specific policies to the lambda function
-so that it can access other AWS resources.
-
-To deploy the application, you can run the following command:
+### 3. Directory Structure
 
 ```
-sam deploy --guided
+📦zonefile-client
+ ┣ 📂src
+ ┃ ┣ 📂main
+ ┃ ┃ ┗ 📂java
+ ┃ ┃ ┃ ┗ 📂com
+ ┃ ┃ ┃ ┃ ┗ 📂nameringers
+ ┃ ┃ ┃ ┃ ┃ ┗ 📂zonefile
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜App.java
+ ┃ ┃ ┃ ┃ ┃ ┃ ┗ 📜DependencyFactory.java
+ ┣ 📂target
+ ┣ 📜.gitignore
+ ┣ 📜pom.xml
+ ┗ 📜template.yaml
 ```
 
-See [Deploying Serverless Applications](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-deploying.html) for more info.
+### 4. Deployment
 
+The [AWS CDK app](#5-aws-cdk-app) takes care of bundling the project files and dependencies into an assembly jar for deployment to Lambda. To deploy the application using the [AWS CDK Toolkit](https://docs.aws.amazon.com/cdk/v2/guide/cli.html), change the current working directory to `cdk` and run `cdk deploy ZoneFileStack`.
 
+### 5. Invoke Lambda Function in Production Environment
 
+The following example shows how to invoke the Lambda function using the AWS CLI. The function output will be saved to a file named `response.json`.
+
+```shell
+aws lambda invoke \
+  --function-name <function-name> \
+  --payload '{ "zone": "com" }' \
+  response.json
+```

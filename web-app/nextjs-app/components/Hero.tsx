@@ -29,7 +29,7 @@ const Hero = ({ className }: Props) => (
                     </p>
                 </h2>
             </div>
-            <Mirror className="h-96 lg:h-2/3 place-self-end z-0 lg:z-10" />
+            <Mirror className="h-72 lg:h-2/3 place-self-end z-0 lg:z-10" />
         </div>
     </div>
 );

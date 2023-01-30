@@ -19,7 +19,7 @@ const Header = () => {
                     opacity: yOffset / 300,
                 }}
             />
-            <BrandName className="text-4xl mx-8 z-20" />
+            <BrandName className="text-3xl lg:text-4xl mx-8 z-20" />
         </header>
     );
 };

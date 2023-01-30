@@ -48,7 +48,7 @@ To invoke the Lambda function locally using the [AWS SAM CLI](https://docs.aws.a
 
 ### 5. Deployment
 
-The [AWS CDK app](#5-aws-cdk-app) takes care of bundling the project files and dependencies into an assembly jar for deployment to Lambda. The CDK app also creates a new version of the Lambda layer used for sharing the serialised model trained by the Spark application. To deploy the application using the [AWS CDK Toolkit](https://docs.aws.amazon.com/cdk/v2/guide/cli.html), change the current working directory to `cdk` and run `cdk deploy WeaviateClientStack`.
+The [AWS CDK app](#5-aws-cdk-app) takes care of bundling the project files and dependencies into an assembly jar for deployment to Lambda. The CDK app also creates a new version of the Lambda layer used for sharing the serialised model trained by the Spark application. To deploy the application using the [AWS CDK Toolkit](https://docs.aws.amazon.com/cdk/v2/guide/cli.html), change the current working directory to `cdk` and run `cdk deploy WeaviateClientStack`. See the [AWS CDK app](../README.md#5-aws-cdk-app) section of the main README for details of how to set up the AWS CDK Toolkit.
 
 ### 6. Invoke Lambda REST API in Production Environment
 

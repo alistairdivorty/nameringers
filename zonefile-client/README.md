@@ -38,7 +38,7 @@ This is a Lambda function written in Java that fetches compressed TXT files cont
 
 ### 4. Deployment
 
-The [AWS CDK app](#5-aws-cdk-app) takes care of bundling the project files and dependencies into an assembly jar for deployment to Lambda. To deploy the application using the [AWS CDK Toolkit](https://docs.aws.amazon.com/cdk/v2/guide/cli.html), change the current working directory to `cdk` and run `cdk deploy ZoneFileStack`.
+The [AWS CDK app](#5-aws-cdk-app) takes care of bundling the project files and dependencies into an assembly jar for deployment to Lambda. To deploy the application using the [AWS CDK Toolkit](https://docs.aws.amazon.com/cdk/v2/guide/cli.html), change the current working directory to `cdk` and run `cdk deploy ZoneFileStack`. See the [AWS CDK app](../README.md#5-aws-cdk-app) section of the main README for details of how to set up the AWS CDK Toolkit.
 
 ### 5. Invoke Lambda Function in Production Environment
 

@@ -287,8 +287,12 @@ To create a file for storing environment variables used by the CDK application d
  ┃ ┗ 📜tsconfig.json
  ┣ 📂nexjs-app
  ┃ ┣ 📂components
+ ┃ ┃ ┣📜SearchForm.tsx
+ ┃ ┃ ┗📜...
  ┃ ┣ 📂context
+ ┃ ┃ ┗📜domainsContext.tsx
  ┃ ┣ 📂hooks
+ ┃ ┃ ┗📜useDomainsObserver.tsx
  ┃ ┣ 📂pages
  ┃ ┃ ┣ 📜_app.tsx
  ┃ ┃ ┣ 📜_document.tsx
